@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[96]:
+# In[3]:
 
 import pandas as pd
 import numpy as np
@@ -14,7 +14,7 @@ os.chdir('/Users/Wizard/GitHub/Myprojects/')
 os.getcwd()
 
 
-# In[28]:
+# In[4]:
 
 #load files
 df1 = pd.read_csv('Big Mart/Data/train.csv')
@@ -24,7 +24,7 @@ tf = pd.DataFrame(df2, copy =True)
 test = [df,tf]
 
 
-# In[29]:
+# In[5]:
 
 #descriptive statistics
 print df.shape
@@ -34,7 +34,7 @@ print '\ndescribe\n'
 print df.describe()
 
 
-# In[30]:
+# In[6]:
 
 #dfcolumns
 print df.columns
@@ -44,7 +44,7 @@ print '\nNull values count\n'
 print df.isnull().sum()
 
 
-# In[31]:
+# In[7]:
 
 for i in test:
     i.loc[i['Item_Weight'].isnull(), 'Item_Weight'] = round(i['Item_Weight'].mean(),0)
@@ -52,7 +52,7 @@ for i in test:
     i['Item_Weight'].mean()
 
 
-# In[32]:
+# In[8]:
 
 print 'sum of individual unique values in a selected column'
 
@@ -61,7 +61,7 @@ for i in df[['Item_Fat_Content','Item_Type','Outlet_Location_Type','Outlet_Type'
     print df[i].value_counts()
 
 
-# In[33]:
+# In[9]:
 
 from scipy.stats import mode
 for i in test:
@@ -69,7 +69,7 @@ for i in test:
     i.loc[i['Outlet_Size'].isnull(), 'Outlet_Size']= i.loc[i['Outlet_Size'].isnull(),'Outlet_Type'].apply(lambda x:a[x])
 
 
-# In[34]:
+# In[10]:
 
 #print df.isnull().sum()
 print df.describe()
@@ -77,7 +77,7 @@ print '\n ----- \n'
 print df.head()
 
 
-# In[35]:
+# In[11]:
 
 #Feature engineering
 #1 Modify Item_Visibility
@@ -85,7 +85,7 @@ for i in test:
     i.loc[i['Item_Visibility']==0, 'Item_Visibility'] = i['Item_Visibility'].mean()
 
 
-# In[36]:
+# In[12]:
 
 # 2. Food types
 for i in test:
@@ -94,7 +94,7 @@ for i in test:
     #print np.unique(df['Item_Type_New'])
 
 
-# In[37]:
+# In[13]:
 
 # 3. Fat items 
 for i in test:
@@ -103,14 +103,14 @@ for i in test:
     i.loc[i['Item_Type_New']=='Non-consummables', 'Item_Fat_Content'] = 'Non-edible'
 
 
-# In[38]:
+# In[14]:
 
 #store operating year
 for i in test:
     i['Outlet_Operating_Year'] = 2013-i['Outlet_Establishment_Year']
 
 
-# In[39]:
+# In[15]:
 
 #Step 5: Numerical and One-Hot Coding of Categorical variables
 #Import library:
@@ -123,7 +123,7 @@ for i in test:
         i[j]=le.fit_transform(i[j])
 
 
-# In[40]:
+# In[16]:
 
 #One Hot Coding:
 col = [u'Item_Fat_Content', u'Outlet_Size', u'Outlet_Location_Type',u'Outlet_Type', u'Item_Type_New',u'Outlet']
@@ -136,13 +136,13 @@ tf = pd.get_dummies(tf, columns = col)
 df.head()
 
 
-# In[ ]:
+# In[17]:
 
 df.drop(['Outlet_Establishment_Year','Item_Type'],axis=1, inplace =True)
 tf.drop(['Outlet_Establishment_Year','Item_Type'],axis=1, inplace =True)
 
 
-# In[45]:
+# In[18]:
 
 print df.shape
 print df.dtypes
@@ -154,14 +154,14 @@ print tf.shape
 print df.dtypes
 
 
-# In[48]:
+# In[19]:
 
 #Export files as modified versions:
 df.to_csv("train_modified.csv",index=False)
 tf.to_csv("test_modified.csv",index=False)
 
 
-# In[54]:
+# In[20]:
 
 #Model building
 #mean model - base model
@@ -178,18 +178,18 @@ base1.head()
 df.dtypes
 
 
-# In[79]:
+# In[21]:
 
 #create target, id, 
 target = 'Item_Outlet_Sales'
 Id = ['Item_Identifier','Outlet_Identifier']
 from sklearn import cross_validation, metrics
-def modelfit(alg, train, test, predictor, target, Id):
+def modelfit(alg, train, test, predictor, target, Id, filename):
     alg.fit(train[predictor], train[target])
     #training predictions
     train_predictions = alg.predict(train[predictor])
     #test predictions
-    test_predictions = alg.predict(test[predictor])
+    test[target] = alg.predict(test[predictor])
     #validationscore 
     cv_score = cross_validation.cross_val_score(alg, train[predictor], train[target], 
                                                        cv=10,scoring='mean_squared_error')
@@ -199,31 +199,36 @@ def modelfit(alg, train, test, predictor, target, Id):
     print "RMSE %4f" %np.sqrt(metrics.mean_squared_error(train[target].values, train_predictions))
     print "cv score mean - %4f|std - %4f| min - %4f| max - %4f" %(np.mean(cv_score),np.std(cv_score),
                                                                 np.min(cv_score),np.max(cv_score))
+    
+    #Export submission file:
+    Id.append(target)
+    submission = pd.DataFrame({ x: test[x] for x in Id})
+    submission.to_csv(filename, index=False)
 
 
-# In[80]:
+# In[22]:
 
 from sklearn.linear_model import LinearRegression
 predictor = [x for x in df.columns if x not in [target]+Id]
 
 
-# In[82]:
+# In[24]:
 
 LR = LinearRegression(normalize = True) 
-modelfit(LR, df, tf, predictor, target, Id)
+modelfit(LR, df, tf, predictor, target, Id, 'lr.csv')
 
 
-# In[99]:
+# In[25]:
 
 pd.Series(LR.coef_, predictor).sort_values().plot(kind = 'bar', title='Model Coefficients')
 
 
-# In[102]:
+# In[26]:
 
 print LR.intercept_
 
 
-# In[105]:
+# In[27]:
 
 print LR.predict(df[predictor])
 print df['Item_Outlet_Sales']
